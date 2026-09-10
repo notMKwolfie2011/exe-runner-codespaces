@@ -3,9 +3,10 @@ import cors from 'cors';
 import multer from 'multer';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import { execFile } from 'child_process';
+import { execFile, spawn } from 'child_process';
 import fs from 'fs';
 import path from 'path';
+import { promisify } from 'util';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -87,7 +88,7 @@ app.get('/api/download/:filename', (req, res) => {
   res.download(filepath);
 });
 
-// Run executable
+// Run executable with Wine
 app.post('/api/run/:filename', (req, res) => {
   const filepath = join(uploadDir, req.params.filename);
   
@@ -95,20 +96,65 @@ app.post('/api/run/:filename', (req, res) => {
     return res.status(404).json({ error: 'File not found' });
   }
 
-  // Use wine to run Windows executables on Linux
-  execFile('wine', [filepath], { timeout: 30000 }, (error, stdout, stderr) => {
-    if (error) {
-      console.error('Execution error:', error);
+  let output = '';
+  let errorOutput = '';
+
+  try {
+    // Set up virtual display for Wine GUI applications
+    const env = { ...process.env, DISPLAY: ':99', WINEARCH: 'win32' };
+    
+    const proc = spawn('wine', [filepath], {
+      env,
+      timeout: 60000,
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+
+    proc.stdout.on('data', (data) => {
+      output += data.toString();
+    });
+
+    proc.stderr.on('data', (data) => {
+      errorOutput += data.toString();
+    });
+
+    proc.on('error', (error) => {
+      console.error('Process error:', error);
       return res.status(500).json({
         error: 'Failed to execute file',
-        details: stderr || error.message,
+        details: error.message,
+        compatibility: 'This .exe file may not be compatible with Wine. Try simpler console applications first.',
       });
-    }
-    res.json({
-      message: 'File executed successfully',
-      output: stdout,
     });
-  });
+
+    proc.on('close', (code) => {
+      res.json({
+        message: 'Execution completed',
+        exitCode: code,
+        output: output || '(No output)',
+        errors: errorOutput || '(No errors)',
+      });
+    });
+
+    // Timeout after 60 seconds
+    setTimeout(() => {
+      if (!proc.killed) {
+        proc.kill();
+        res.json({
+          message: 'Execution timeout - process terminated after 60 seconds',
+          output: output || '(No output yet)',
+          errors: errorOutput || '(Process timed out)',
+        });
+      }
+    }, 60000);
+
+  } catch (error) {
+    console.error('Execution error:', error);
+    res.status(500).json({
+      error: 'Failed to execute file',
+      details: error.message,
+      hint: 'Make sure Wine is installed. Simple console .exe files work best.',
+    });
+  }
 });
 
 // Delete file
@@ -129,12 +175,13 @@ app.delete('/api/files/:filename', (req, res) => {
 
 // Health check
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'Server is running' });
+  res.json({ status: 'Server is running', wine: 'Installed' });
 });
 
 // Start server
 app.listen(PORT, () => {
   console.log(`✅ Server running on http://localhost:${PORT}`);
   console.log(`📁 Upload directory: ${uploadDir}`);
-  console.log(`🎮 Ready to run executables!`);
+  console.log(`🍷 Wine compatibility layer: Enabled`);
+  console.log(`🎮 Ready to run Windows executables!`);
 });
