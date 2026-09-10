@@ -8,26 +8,29 @@
     "ghcr.io/devcontainers/features/git:latest": {}
   },
   "containerEnv": {
-    "NODE_ENV": "development"
+    "NODE_ENV": "development",
+    "DISPLAY": ":99"
   },
-  "postCreateCommand": "npm install && npm run setup",
+  "postCreateCommand": "bash .devcontainer/setup.sh",
+  "postStartCommand": "npm start",
   "forwardPorts": [3000, 5173],
   "portsAttributes": {
     "3000": {
       "label": "Application",
-      "onAutoForward": "notify"
+      "onAutoForward": "openBrowser",
+      "requireLocalPort": false
     },
     "5173": {
       "label": "Vite Dev Server",
-      "onAutoForward": "notify"
+      "onAutoForward": "notify",
+      "requireLocalPort": false
     }
   },
   "customizations": {
     "vscode": {
       "extensions": [
         "dbaeumer.vscode-eslint",
-        "esbenp.prettier-vscode",
-        "ms-azuretools.vscode-docker"
+        "esbenp.prettier-vscode"
       ],
       "settings": {
         "editor.formatOnSave": true,
@@ -35,6 +38,5 @@
       }
     }
   },
-  "remoteUser": "root",
-  "onCreateCommand": "apt-get update && apt-get install -y wine wine32 wine64 winetricks xvfb"
+  "remoteUser": "root"
 }
