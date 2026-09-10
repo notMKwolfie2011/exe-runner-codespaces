@@ -13,7 +13,8 @@ function App() {
   const [running, setRunning] = useState(false);
   const [output, setOutput] = useState('');
 
-  const API_URL = 'http://localhost:3000/api';
+  // Use relative API URL to work with any hostname
+  const API_URL = '/api';
 
   // Load files on mount
   useEffect(() => {
@@ -29,7 +30,7 @@ function App() {
       setError(null);
     } catch (err) {
       console.error('Error loading files:', err);
-      setError('Failed to load files');
+      setError('Failed to load files - backend server may not be running');
     }
   };
 
